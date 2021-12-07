@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Type;
 use App\Article;
+use App\Type;
 use Illuminate\Http\Request;
+use Validator;
 
 class TypeController extends Controller
 {
@@ -15,9 +16,9 @@ class TypeController extends Controller
      */
     public function index()
     {
-        $types = Type::all();
         $articles = Article::all();
-        return view('type.index', ['types'=>$types, 'articles'=> $articles]);
+        $types = Type::all();
+        return view('type.index',['types'=> $types, 'articles'=> $articles]);
     }
 
     /**
@@ -27,7 +28,8 @@ class TypeController extends Controller
      */
     public function create()
     {
-        return view("type.create");
+        $articles = Article::all();
+        return view("type.create", ['articles'=> $articles]);
     }
 
     /**
@@ -38,39 +40,55 @@ class TypeController extends Controller
      */
     public function store(Request $request)
     {
+        $articleNew = $request->articleNew;
 
-        $articlesNew = $request->articlesNew;
+        if($articleNew == "1") {
+            $article = new Article;
+            $article->title =  $request->articleTitle;
+            $article->description = $request->articleDescription;
+
+            $article->save();
+
+            $articleId = $article->id;
+        } else {
+            $articleId = $request->typeArticle;
+        }
+
 
         $type = new Type;
 
         $type->title = $request->typeTitle;
         $type->description = $request->typeDescription;
+        $type->article_id = $articleId;
+
         $type->save();
 
-        return redirect()->route("type.index");
+        return redirect()->route('type.index');
     }
 
     public function storeAjax(Request $request) {
 
 
-        $type = new Type();
+        $type = new Type;
 
-        $input = [                 //ivedami laukeliu pavadinimai, kurie bus validuojami
+        $input = [
             'typeTitle' => $request->typeTitle,
             'typeDescription' => $request->typeDescription,
-        ];
 
-        $rules = [             // validacijos taisykles/reikalavimai
-            'typeTitle' => 'required|min:3|max:20',
-            'typeDescription' => 'min:20',
-        ];
+        ];//ka mes ivedama, laukeliu pavadinimai kuriuos validuosim
+
+        $rules = [
+            'typeTitle' => 'required|min:3',
+            'typeDescription' => 'min:15',
+
+        ]; //taisykles
 
         $validator = Validator::make($input, $rules);
 
-        // jeigu validacija praeina:
         if($validator->passes()) {
-            $type->title= $request->typeTitle;
+            $type->title = $request->typeTitle;
             $type->description = $request->typeDescription;
+
 
             $type->save();
 
@@ -79,6 +97,7 @@ class TypeController extends Controller
                 'typeId' => $type->id,
                 'typeTitle' => $type->title,
                 'typeDescription' => $type->description,
+
             ];
 
             $success_json = response()->json($success);
@@ -93,8 +112,8 @@ class TypeController extends Controller
         $errors_json = response()->json($errors);
 
         return $errors_json;
-    }
 
+    }
     /**
      * Display the specified resource.
      *
@@ -103,10 +122,7 @@ class TypeController extends Controller
      */
     public function show(Type $type)
     {
-        $articles = $type->typeArticles;
-        $articlesCount = $articles->count();
-
-        return view("type.show",['type' => $type, 'articles'=>$articles, 'articlesCount'=> $articlesCount]);
+        return view("type.show", ['type' => $type]);
     }
 
     public function showAjax(Type $type) {
@@ -115,7 +131,7 @@ class TypeController extends Controller
             'success' => 'Type recieved successfully',
             'typeId' => $type->id,
             'typeTitle' => $type->title,
-            'typeDescription' => $type->description,
+            'typeDescription' => $type->description
         ];
 
         $success_json = response()->json($success);
@@ -134,13 +150,13 @@ class TypeController extends Controller
         return view("type.edit", ['type'=> $type]);
     }
 
+    //gauti informacija apie klienta i edit modal forma
     public function editAjax(Type $type) {
-
         $success = [
             'success' => 'Type recieved successfully',
             'typeId' => $type->id,
             'typeTitle' => $type->title,
-            'typeDescription' => $type->description,
+            'typeDescription' => $type->description
         ];
 
         $success_json = response()->json($success);
@@ -157,20 +173,22 @@ class TypeController extends Controller
      */
     public function update(Request $request, Type $type)
     {
-        //
+
+
     }
 
-
+    //kuri atnaujintus duomenis patalpis i duomenu baze
     public function updateAjax(Request $request, Type $type) {
-        $input = [            // redaguojami input
+        $input = [
             'typeTitle' => $request->typeTitle,
-            'typeDescription' => $request->typeDescription,
-        ];
+            'typeDescription' => $request->typeDescription
 
-        $rules = [                //taisykles/ reikalavimai validacijai
-            'typeTitle' => 'required|min:3|max:20',
-            'typeDescription' => 'min:15',
-        ];
+        ];//ka mes ivedama, laukeliu pavadinimai kuriuos validuosim
+
+        $rules = [
+            'typeTitle' => 'required|min:3',
+            'typeDescription' => 'min:15'
+        ]; //taisykles
 
         $validator = Validator::make($input, $rules);
 
@@ -178,13 +196,14 @@ class TypeController extends Controller
             $type->title = $request->typeTitle;
             $type->description = $request->typeDescription;
 
+
             $type->save();
 
             $success = [
                 'success' => 'Type update successfully',
                 'typeId' => $type->id,
                 'typeTitle' => $type->title,
-                'typeDescription' => $type->description,
+                'typeDescription' => $type->description
             ];
 
             $success_json = response()->json($success);
@@ -209,40 +228,97 @@ class TypeController extends Controller
      */
     public function destroy(Type $type)
     {
-        //
+        $type->delete();
+        return redirect()->route("type.index");
     }
 
-    // Sukuriama nauja funkcija- pasirenkami ir istrinami Type
-    public function destroySelected(Request $request) {
+    public function destroyAjax(Type $type)
+    {
+        $article_id = $type->article_id;
 
-        $checkedTypes = $request->checkedTypes;
+        $type->delete();
 
-        $messages = array();
+        $typesLeft = type::where('article_id', $article_id)->get() ;
+        $typesCount = $typesLeft->count();
 
-        $errorsuccess = array();
+        //sekmes nesekmes zinute
+        $success = [
+            "success" => "The Type deleted successfuly",
+            "typesCount" => $typesCount
+        ];
+        $success_json = response()->json($success);
 
-        // Perduodami Type ID reiksmes
+        return $success_json;
+    }
 
-        foreach($checkedTypes as $typeId) {
-            // surandamas Type ID
-            $type = Type::find($typeId);
-            $articles_count = $type->typeArticles->count();
+    public function searchAjax(Request $request) {
 
-            $deleteAction = $type->delete();
+        $searchValue = $request->searchField;
 
-                if($deleteAction) {
-                    $errorsuccess[] = 'success';
-                    $messages[] = "Type ".$typeId." deleted successfully"; // parodoma koks Type istrintas
-                } else {
-                    $messages[] = "Something went wrong";
-                    $errorsuccess[] = 'danger';
-                }
+        $types = Type::query()
+            ->where('title', 'like', "%{$searchValue}%")
+            ->orWhere('description', 'like', "%{$searchValue}%")
+            ->get();
+
+
+        if($searchValue == '' || count($types)!= 0) {
+
+            $success = [
+                'success' => 'Found '.count($types),
+                'types' => $types
+            ];
+
+            $success_json = response()->json($success);
+
+
+            return $success_json; //yra musu sekmes pranesimas
         }
 
+        $error = [
+            'error' => 'No results are found'
+        ];
+
+        $errors_json = response()->json($error);
+
+        return $errors_json;
+
+    }
+
+    public function indexAjax(Request $request) {
+
+        $sortCol = $request->sortCol;
+
+        $sortOrder = $request->sortOrder;
+
+        $article_id = $request->article_id;
+
+        if($article_id == 'all') {
+            $types = Type::orderBy($sortCol, $sortOrder)->get();
+        } else {
+            $types = Type::where('article_id', $article_id)->orderBy($sortCol, $sortOrder)->get();
+        }
+
+
+        foreach ($types as $type) {
+            $type['articleTitle'] = $type->typeArtical->title;
+        }
+
+        $types_count = count($types);
+
+
+        if ($types_count == 0) {
+            $error = [
+                'error' => 'There are no types',
+            ];
+
+            $error_json = response()->json($error);
+            return $error_json;
+        }
+
+
         $success = [
-            'success' => $checkedTypes,
-            'messages' => $messages,
-            'errorsuccess' => $errorsuccess
+            'success' => 'Types sorted successfuly',
+            'types' => $types
         ];
 
         $success_json = response()->json($success);
@@ -250,11 +326,39 @@ class TypeController extends Controller
         return $success_json;
 
     }
+
+    public function filterAjax(Request $request) {
+
+        $article_id = $request->article_id;
+
+        if($article_id == 'all') {
+            $types = Type::all();
+        } else {
+            $types = Type::all()->where('article_id', $article_id);
+        }
+
+        foreach ($types as $type) {
+            $type['articleTitle'] = $type->typeArticle->title;
+        }
+
+        $types_count = count($types);
+
+        if ($types_count == 0) {
+            $error = [
+                'error' => 'There are no types',
+            ];
+
+            $error_json = response()->json($error);
+            return $error_json;
+        }
+
+        $success = [
+            'success' => 'Types filtered successfuly',
+            'types' => $types
+        ];
+
+        $success_json = response()->json($success);
+
+        return $success_json;
+    }
 }
-
-
-
-
-
-
-

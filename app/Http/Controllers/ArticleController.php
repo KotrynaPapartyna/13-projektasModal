@@ -16,7 +16,10 @@ class ArticleController extends Controller
      */
     public function index()
     {
+
+
         $articles = Article::all();
+
         $types = Type::all();
         return view('article.index',['articles'=> $articles, 'types'=> $types]);
     }
@@ -42,7 +45,7 @@ class ArticleController extends Controller
     {
         $typeNew = $request->typeNew;
 
-        if($typeNew == "1") {
+        if($typeNew == "1") { // koks kintamojo tipas ateina is checkbox jei jis pazymetas? 1 tekstas
             $type = new Type;
             $type->title =  $request->typeTitle;
             $type->description = $request->typeDescription;
@@ -69,25 +72,24 @@ class ArticleController extends Controller
     public function storeAjax(Request $request) {
 
 
-        $article = new Article();
+        $article = new Article;
 
-        $input = [                 //ivedami laukeliu pavadinimai, kurie bus validuojami
+        $input = [
             'articleTitle' => $request->articleTitle,
             'articleDescription' => $request->articleDescription,
             'articleType' => $request->articleType
         ];
 
-        $rules = [             // validacijos taisykles/reikalavimai
-            'articleTitle' => 'required|min:3|max:20',
-            'articleDescription' => 'min:20',
+        $rules = [
+            'articleTitle' => 'required|min:3',
+            'articleDescription' => 'min:15',
             'articleType' => 'numeric'
         ];
 
         $validator = Validator::make($input, $rules);
 
-        // jeigu validacija praeina:
         if($validator->passes()) {
-            $article->title= $request->articleTitle;
+            $article->title = $request->articleTitle;
             $article->description = $request->articleDescription;
             $article->type_id = $request->articleType;
 
@@ -154,7 +156,6 @@ class ArticleController extends Controller
 
 
     public function editAjax(Article $article) {
-
         $success = [
             'success' => 'Article recieved successfully',
             'articleId' => $article->id,
@@ -183,14 +184,14 @@ class ArticleController extends Controller
 
 
     public function updateAjax(Request $request, Article $article) {
-        $input = [            // redaguojami input
+        $input = [
             'articleTitle' => $request->articleTitle,
             'articleDescription' => $request->articleDescription,
             'articleType' => $request->articleType
         ];
 
-        $rules = [                //taisykles/ reikalavimai validacijai
-            'articleTitle' => 'required|min:3|max:20',
+        $rules = [
+            'articleTitle' => 'required|min:3',
             'articleDescription' => 'min:15',
             'articleType' => 'numeric'
         ];
@@ -198,7 +199,7 @@ class ArticleController extends Controller
         $validator = Validator::make($input, $rules);
 
         if($validator->passes()) {
-            $article->title = $request->articleTitle;
+            $article->title= $request->articleTitle;
             $article->description = $request->articleDescription;
             $article->type_id = $request->articleType;
 
@@ -252,40 +253,84 @@ class ArticleController extends Controller
             "success" => "The Article deleted successfuly",
             "articlesCount" => $articlesCount
         ];
+
         $success_json = response()->json($success);
 
         return $success_json;
     }
 
-// Sukuriama nauja funkcija- pasirenkami ir istrinami Type
-    public function destroySelected(Request $request) {
+    public function searchAjax(Request $request) {
 
-        $checkedArticles = $request->checkedArticles;
-
-        $messages = array();
-
-        $errorsuccess = array();
-
-        foreach($checkedArticles as $articleId) {
-
-            $article = Article::find($articleId);
+        $searchValue = $request->searchField;
 
 
-            $deleteAction = $article->delete();
+        $articles = Article::query()
+            ->where('title', 'like', "%{$searchValue}%")
+            ->orWhere('description', 'like', "%{$searchValue}%")
+            ->get();
 
-                if($deleteAction) {
-                    $errorsuccess[] = 'success';
-                    $messages[] = "Article ".$articleId." deleted successfully";
-                } else {
-                    $messages[] = "Something went wrong";
-                    $errorsuccess[] = 'danger';
-                }
+        foreach ($articles as $article) {
+            $article['typeTitle'] = $article->articleType->title;
         }
 
+        if($searchValue == '' || count($articles)!= 0) {
+
+            $success = [
+                'success' => 'Found '.count($articles),
+                'articles' => $articles
+            ];
+
+            $success_json = response()->json($success);
+
+
+            return $success_json; //yra musu sekmes pranesimas
+        }
+
+        $error = [
+            'error' => 'No results are found'
+        ];
+
+        $errors_json = response()->json($error);
+
+        return $errors_json;
+
+    }
+
+    public function indexAjax(Request $request) {
+
+        $sortCol = $request->sortCol;
+
+        $sortOrder = $request->sortOrder;
+
+        $type_id = $request->type_id;
+
+        if($type_id == 'all') {
+            $articles = Article::orderBy($sortCol, $sortOrder)->get();
+        } else {
+            $articles = Article::where('type_id', $type_id)->orderBy($sortCol, $sortOrder)->get();
+        }
+
+
+        foreach ($articles as $article) {
+            $article['typeTitle'] = $article->articleType->title;
+        }
+
+        $articles_count = count($articles);
+
+
+        if ($articles_count == 0) {
+            $error = [
+                'error' => 'There are no articles',
+            ];
+
+            $error_json = response()->json($error);
+            return $error_json;
+        }
+
+
         $success = [
-            'success' => $checkedArticles,
-            'messages' => $messages,
-            'errorsuccess' => $errorsuccess
+            'success' => 'Articles sorted successfuly',
+            'articles' => $articles
         ];
 
         $success_json = response()->json($success);
@@ -293,11 +338,42 @@ class ArticleController extends Controller
         return $success_json;
 
     }
+
+    public function filterAjax(Request $request) {
+
+        $type_id = $request->type_id;
+
+        if($type_id == 'all') {
+            $articles = Article::all();
+        } else {
+            $articles = Article::all()->where('type_id', $type_id);
+        }
+
+        foreach ($articles as $article) {
+            $article['typeTitle'] = $article->articleType->title;
+        }
+
+        $articles_count = count($articles);
+
+        if ($articles_count == 0) {
+            $error = [
+                'error' => 'There are no articles',
+            ];
+
+            $error_json = response()->json($error);
+            return $error_json;
+        }
+
+        $success = [
+            'success' => 'Articles filtered successfuly',
+            'articles' => $articles
+        ];
+
+        $success_json = response()->json($success);
+
+        return $success_json;
+
+
+
+    }
 }
-
-
-
-
-
-
-

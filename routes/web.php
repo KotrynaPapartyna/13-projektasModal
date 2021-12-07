@@ -40,6 +40,12 @@ Route::prefix('articles')->group(function () {
 
     Route::get('show/{article}', 'ArticleController@show')->name('article.show');
     Route::get('showAjax/{article}', 'ArticleController@showAjax')->name('article.showAjax');
+
+    Route::get('searchAjax', 'ArticleController@searchAjax') ->name('article.searchAjax');
+    Route::get('indexAjax', 'ArticleController@indexAjax') ->name('article.indexAjax');
+    Route::get('filterAjax', 'ArticleController@filterAjax') ->name('article.filterAjax');
+
+
     // pazymetu panaikinimas
     Route::post('destroySelected', 'ArticleController@destroySelected')->name('article.destroySelected');
 });
@@ -63,6 +69,11 @@ Route::prefix('types')->group(function () {
 
     Route::get('show/{type}', 'TypeController@show')->name('type.show');
     Route::get('showAjax/{type}', 'TypeController@showAjax')->name('type.showAjax');
+
+
+    Route::get('searchAjax', 'TypeController@searchAjax') ->name('type.searchAjax');
+    Route::get('indexAjax', 'TypeController@indexAjax') ->name('type.indexAjax');
+    Route::get('filterAjax', 'TypeController@filterAjax') ->name('type.filterAjax');
 
     // pazymetu panaikinimas
     Route::post('destroySelected', 'TypeController@destroySelected')->name('type.destroySelected');
